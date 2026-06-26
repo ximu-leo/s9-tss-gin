@@ -28,9 +28,13 @@ func BlockOnInterruptsContext(ctx context.Context, signals ...os.Signal) {
 		signals = DefaultInterruptSignals
 	}
 	interruptChannel := make(chan os.Signal, 1)
+	// signal.Notify 不是“打包”，而是“订阅”
+	// 把四个其中之一的信号 放入interruptChannel 通道中
 	signal.Notify(interruptChannel, signals...)
 	select {
+	// 通道中有值，唤醒并退出，不管有没有执行操作，都退出，这里没什么操作
 	case <-interruptChannel:
+	// 上级通知结束程序，唤醒并退出
 	case <-ctx.Done():
 		signal.Stop(interruptChannel)
 	}

@@ -1,7 +1,7 @@
 // 1、service 定义了“我能干什么”
 package services
 
-import "s9-tss-gin/model"
+import "github.com/ximu-leo/s9-tss-gin/model"
 
 type SignService interface {
 	// 密钥生成，需要有入参

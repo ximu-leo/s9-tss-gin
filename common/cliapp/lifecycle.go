@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/urfave/cli/v2"
 	"github.com/ximu-leo/s9-tss-gin/common/opio"
 )
 
@@ -15,9 +16,11 @@ type Lifecycle interface {
 	Stopped() bool
 }
 
+// 定义一个“函数模板”
 type LifecycleAction func(ctx *cli.Context, close context.CancelCauseFunc) (Lifecycle, error)
 
 func LifecycleCmd(fn LifecycleAction) cli.ActionFunc {
+	// 乌拉：opio.BlockOnInterruptsContext 这里只是  引用函数，不是调用函数，所以无参数
 	return lifecycleCmd(fn, opio.BlockOnInterruptsContext)
 }
 
@@ -31,11 +34,16 @@ func lifecycleCmd(fn LifecycleAction, blockOnInterrupt waitSignalFn) cli.ActionF
 		appCtx, appCancel := context.WithCancelCause(hostCtx)
 		ctx.Context = appCtx
 
+		// 启动 1个协程  G1 协程
 		go func() {
+			// 乌拉：真正调用函数
 			blockOnInterrupt(appCtx)
+			// 调用 appCancel(interruptErr) 时，Go 内部会做两件事：
+			// 关闭 appCtx.Done() 这个通道（给警报器通电）。
+			// 记录错误原因。
 			appCancel(interruptErr)
 		}()
-
+		//实际上调用就是 runGinHttp(ctx, appCancel)
 		appLifecycle, err := fn(ctx, appCancel)
 		if err != nil {
 			return errors.Join(
@@ -51,6 +59,8 @@ func lifecycleCmd(fn LifecycleAction, blockOnInterrupt waitSignalFn) cli.ActionF
 			)
 		}
 
+		// appCtx.Done() 是 Context 自带的“关门通道”，它被 appCancel 函数控制
+		// 觉察到 关闭 appCtx.Done()，继续往下
 		<-appCtx.Done()
 
 		stopCtx, stopCancel := context.WithCancelCause(hostCtx)
